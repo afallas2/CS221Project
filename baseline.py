@@ -40,25 +40,46 @@ class QLearningAlgorithm():
         self.explorationProb = explorationProb
         self.weights = defaultdict(float)
         self.numIters = 0
-        self.discount = discount
-        self.stepSize = 1
+        self.stepSize = .005
 
-
-    # Return the Q function associated with the weights and features
-    def getQ(self, state, action):
+    def otherGetQ(self, state, action):
         score = 0.0
-        for f, v in self.featureExtractor(state, action):
+        print("action is:{}".format(action))
+        features = self.featureExtractor(state, action)
+        for f, v in features:
+            if f not in self.weights:
+                self.weights[f] = 1
             if math.isnan(self.weights[f]):
                 score += float(v)
             else:
                 score += float(self.weights[f] * v)
         if ((score) > (2 ** 31 - 1)):
-            
-            return (2 ** 31 - 1)
-        if score < (-1*(2 ** 31 - 1)):
-            return -(2 ** 31 - 1)
-        if score == float("inf"):
-            return (2 ** 31 - 1)
+            score = (2 ** 31 - 1)
+        elif score < (-1*(2 ** 31 - 1)):
+            score = -(2 ** 31 - 1)
+        elif score == float("inf"):
+            score = (2 ** 31 - 1)
+        print("score is:{}".format(score))
+        return score
+
+
+    # Return the Q function associated with the weights and features
+    def getQ(self, state, action):
+        score = 0.0
+        features = self.featureExtractor(state, action)
+        for f, v in features:
+            if f not in self.weights:
+                self.weights[f] = 1
+            if math.isnan(self.weights[f]):
+                score += float(v)
+            else:
+                score += float(self.weights[f] * v)
+        if ((score) > (2 ** 31 - 1)):
+            score = (2 ** 31 - 1)
+        elif score < (-1*(2 ** 31 - 1)):
+            score = -(2 ** 31 - 1)
+        elif score == float("inf"):
+            score = (2 ** 31 - 1)
         return score
 
     # This algorithm will produce an action given a state.
@@ -89,6 +110,7 @@ class QLearningAlgorithm():
             for action in self.actions:
                 if self.getQ(newState, action) > vopt:
                     vopt = self.getQ(newState, action)
+
             #vopt = max([self.getQ(newState, action) for action in self.actions(newState)])
         else:
             vopt = 0
@@ -97,15 +119,20 @@ class QLearningAlgorithm():
         prediction = self.getQ(state, action)
 
         target = reward + (self.discount * vopt)
-
         for key, value in curFeatures:
             if self.weights[key] > (2 ** 31 - 1):
                 self.weights[key] = (2 ** 31 - 1)
-            elif self.weights[key] < (2 ** 31 - 1):
-                self.weights[key] = (2 ** 31 - 1)
+            elif self.weights[key] < -1*(2 ** 31 - 1):
+                self.weights[key] = -(2 ** 31 - 1)
             else:
-                self.weights[key] -= (n * (prediction - target) * value)
+                self.weights[key] = self.weights[key] - (n * (prediction - target) * value)
             #self.weights[key] = float('%.3f'%(self.weights[key]))
+        totalWeight = 0.0
+        for val in self.weights:
+            totalWeight += float(self.weights[val])
+        for value in self.weights:
+            self.weights[value] = float(self.weights[value]) / totalWeight
+
 
 
 def featureExtractor(state, action):
@@ -140,53 +167,52 @@ def discretize(state):
 env = gym.make('LunarLander-v2')
 env.reset()
 observation = [0,0,0,0,0,0,0,0]
-rl = QLearningAlgorithm([0, 1, 2, 3], 1,
+rl = QLearningAlgorithm([0, 1, 2, 3], .9,
                                        featureExtractor,
                                        0.2)
 np.seterr("ignore", "ignore", "ignore", "ignore", "raise")
 
-action = 0
-for i in range(900):
-    avgReward = 0
-    totalReward = 0
-    print("iteration{}".format(i))
-    env.reset()
-    for _ in range(1000):
+# action = 0
+# for i in range(00):
+#     avgReward = 0
+#     totalReward = 0
+#     if i % 100 == 0:
+#         print("iteration{}".format(i))
+#     env.reset()
+#     for _ in range(1000):
 
-        #env.render()
-        newAction = heuristic(env, observation)
+#         #env.render()
+#         newAction = heuristic(env, observation)
         
-        #action = input("what movement?")
-        #action = int(action)
+#         #action = input("what movement?")
+#         #action = int(action)
         
-        newObservation, reward, done, info = env.step(newAction)
-        rl.incorporateFeedback(discretize(observation), action, reward, discretize(newObservation))
-        totalReward += reward
-        posX = newObservation[0] #left, center, or right
-        posY = newObservation[1] #left, center, or right
-        velX = newObservation[2] #going left, going right
-        velY = newObservation[3] #going left, going right
-        verticalAngle = observation[4] #towards upright, away from upright, not moving
-        angularVelocity = observation[5] #towards upright, away from upright, not moving
-        leftLeg = observation[6] #success! or failure
-        rightLeg = observation[7] #success! or failure
-        #time.sleep(.1)
-        action = newAction
-        observation = newObservation
+#         newObservation, reward, done, info = env.step(newAction)
+#         rl.incorporateFeedback(discretize(observation), action, reward, discretize(newObservation))
+#         totalReward += reward
+#         posX = newObservation[0] #left, center, or right
+#         posY = newObservation[1] #left, center, or right
+#         velX = newObservation[2] #going left, going right
+#         velY = newObservation[3] #going left, going right
+#         verticalAngle = observation[4] #towards upright, away from upright, not moving
+#         angularVelocity = observation[5] #towards upright, away from upright, not moving
+#         leftLeg = observation[6] #success! or failure
+#         rightLeg = observation[7] #success! or failure
+#         #time.sleep(.1)
+#         action = newAction
+#         observation = newObservation
         
-        if (done):
-            avgReward += totalReward
-            print("reward:{}".format(totalReward))
-            break    
-print ("average:{}".format((1.0 * avgReward)/900.0))
-print(rl.weights)
+#         if (done):
+#             avgReward += totalReward
+#             #print("reward:{}".format(totalReward))
+#             break    
+#     print("score for this round:{}".format(totalReward))
 
 
 action = 0
 avgReward = 0
-for i in range(1000):
+for i in range(10000):
     totalReward = 0
-    print("iteration{}".format(i))
     env.reset()
     for _ in range(1000):
         #env.render()
@@ -212,37 +238,36 @@ for i in range(1000):
         
         if (done):
             avgReward += totalReward
-            print("reward:{}".format(totalReward))
             break    
 print ("average:{}".format((1.0 * avgReward)/1000.0))
-print(rl.weights)
+for val in rl.weights:
+    if val[1] == 2:
+        print("{}, {}".format(val, rl.weights[val]))
+
 print("WE LEARNED LETS DO THIS")
 observation = [0,0,0,0,0,0,0,0]
 avgReward = 0
-for k in range(10):
+for k in range(100):
     totalReward = 0
     env.reset()
-    print("learned:{}".format(k))
     for _ in range(1000):
-        env.render()
-        print ("{}".format(_))
+        #env.render()
         state = discretize(observation)
         newAction = max((rl.getQ(state, action), action) for action in rl.actions)[1]
-        print ("newaction:{}".format(newAction))
+        #newAction = random.choice([0,1,2,3])
         
         #action = input("what movement?")
         #action = int(action)
         
         newObservation, reward, done, info = env.step(newAction)
-        print("uodating reward:{}".format(totalReward))
         totalReward += reward
         #rl.incorporateFeedback(discretize(observation), action, reward, discretize(observation))
         action = newAction
         observation = newObservation
         if (done):
             avgReward += totalReward
-            print("reward:{}".format(totalReward)) 
             break; 
+    print((totalReward))
 
-print("average:{}".format((1.0 * avgReward)/10.0))
+print("average:{}".format((1.0 * avgReward)/100.0))
 
